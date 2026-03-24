@@ -35,6 +35,10 @@ emotion-recognize = "recognize_cli.cli_recognize:app"
 emotion-tool = "recognize_cli.cli_tool:app"
 
 [project.optional-dependencies]
+modal = [
+  "huggingface-hub>=0.28.1",
+  "modal>=1.1.0",
+]
 train = [
   "bitsandbytes>=0.44.1",
   "opencv-python>=4.0.0",
@@ -82,7 +86,7 @@ ignore = ["F841", "PGH003", "B008", "RUF001"]
 "__init__.py" = ["F401", "I002"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["recognize"]
+known-first-party = ["recognize", "recognize_modal"]
 required-imports = ["from __future__ import annotations"]
 
 [tool.ruff.lint.flake8-tidy-imports]
