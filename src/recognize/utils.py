@@ -135,11 +135,18 @@ def train_epoch(
     train_data_loader: DataLoader,
     *,
     dropout_prob: float | None = None,
+    max_train_batches: int | None = None,
     update_hook: Callable[[int, float], None] | None = None,
 ):
     model.train()
     trainer.clear_losses()
+    batch_num = len(train_data_loader)
+    if max_train_batches is not None:
+        batch_num = min(batch_num, max_train_batches)
+    log_interval = max(1, batch_num // 10)
     for batch_index, batch in enumerate(train_data_loader):
+        if batch_index >= batch_num:
+            break
         # NOTE: randomly remove every modality independently
         if isinstance(batch, LazyMultimodalInput) and dropout_prob is not None:
             if random.random() < dropout_prob:
@@ -148,7 +155,8 @@ def train_epoch(
                 batch.video_paths = None
         trainer.train_batch(batch)
         if update_hook is not None:
-            if batch_index % (len(train_data_loader) // 10):
+            processed_batches = batch_index + 1
+            if processed_batches % log_interval == 0 or processed_batches == batch_num:
                 loss_value = trainer.loss_mean()
                 trainer.clear_losses()
             else:
@@ -169,12 +177,16 @@ def train_and_eval(
     use_valid: bool = True,
     eval_interval: int = 1,
     dropout_prob: float | None = None,
+    max_train_batches: int | None = None,
 ):
+    batch_num = len(train_data_loader)
+    if max_train_batches is not None:
+        batch_num = min(batch_num, max_train_batches)
     trainer = get_trainer(
         model,
         {"train": train_data_loader, "valid": valid_data_loader, "test": test_data_loader or valid_data_loader},
-        len(train_data_loader),
-        len(train_data_loader) * num_epochs,
+        batch_num,
+        batch_num * num_epochs,
     )
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     if test_data_loader is None:
@@ -196,7 +208,6 @@ def train_and_eval(
     stopper.history = [(epoch, history) for epoch, history in stopper.history if epoch <= epoch_start]
 
     last_better_epoch = stopper.last_better_epoch
-    batch_num = len(train_data_loader)
     result: TrainingResult | None = None
 
     logger.info(f"Train model [blue]{model_label}[/]. Save to [blue]{checkpoint_dir}[/]")
@@ -220,10 +231,12 @@ def train_and_eval(
             batch_index=0,
         )
         for epoch in range(epoch_start + 1, num_epochs):
+            progress.update(task, batch_index=0)
             train_epoch(
                 model,
                 trainer,
                 train_data_loader,
+                max_train_batches=max_train_batches,
                 update_hook=lambda batch_index, loss_value: progress.update(
                     task, loss=loss_value, batch_index=batch_index + 1
                 ),

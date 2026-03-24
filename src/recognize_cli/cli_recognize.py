@@ -178,6 +178,13 @@ def train(
     seed: int | None = None,
     checkpoint: Path | None = None,
     from_checkpoint: Path | None = None,
+    num_epochs: int = typer.Option(200, min=1, help="Number of training epochs"),
+    max_train_batches: int | None = typer.Option(
+        None,
+        min=1,
+        help="Maximum number of training batches to process per epoch. Useful for smoke tests.",
+    ),
+    eval_interval: int = typer.Option(1, min=1, help="Evaluate every N epochs"),
     teacher_checkpoint: Path | None = typer.Option(
         None, help="The checkpoint of the teacher model to be used in distillation"
     ),
@@ -342,10 +349,12 @@ def train(
         dev_data_loader,
         test_data_loader,
         checkpoint_dir=checkpoint_dir,
-        num_epochs=200,
+        num_epochs=num_epochs,
         model_label=model_label,
         use_valid=False,
+        eval_interval=eval_interval,
         dropout_prob=config.dropout_prob,
+        max_train_batches=max_train_batches,
     )
     logger.info(f"Test result in best model({model_label}):")
     result.print()

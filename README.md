@@ -84,6 +84,70 @@ uvx nanoflow run experiments/mdn-ablation.toml
 uvx nanoflow run experiments/makd-ablation.toml
 ```
 
+如果只想快速验证训练链路是否正常，也可以直接限制训练轮数或每轮 step 数：
+
+```bash
+uv run emotion-recognize train \
+  configs/dataset/MELD--E.toml \
+  configs/encoders/T+A+V.toml \
+  configs/fusion/DF-1.0.toml \
+  configs/fusion/kwargs/attn.toml \
+  configs/losses/classification/weight.toml \
+  --num-epochs 1 \
+  --max-train-batches 50 \
+  --seed 42
+```
+
+#### 使用 Modal 运行低成本 smoke test
+
+仓库新增了 `src/recognize_modal/app.py`，用于自动化：
+
+- 构建训练用 Modal Image
+- 预热 Hugging Face 权重缓存 Volume
+- 将 `datasets/` 和 `checkpoints/` 直接挂载到远端仓库路径
+- 以受控的 `num_epochs` / `max_train_batches` 运行 smoke train
+
+本地只需要安装 Modal 相关依赖：
+
+```bash
+uv sync --extra modal --dev
+```
+
+创建训练所需的 Volumes：
+
+```bash
+uv run modal volume create emotion-recognition-hf-cache
+uv run modal volume create emotion-recognition-datasets
+uv run modal volume create emotion-recognition-checkpoints
+```
+
+其中 `emotion-recognition-datasets` 里的目录结构需要与本地 `datasets/` 保持一致，例如 `MELD/`、`IEMOCAP/` 等子目录。
+
+可选：先预热默认三模态实验会用到的 Hugging Face 权重：
+
+```bash
+uv run modal run src/recognize_modal/app.py::warm_hf_cache
+```
+
+然后运行一轮默认的 MELD 三模态 smoke train：
+
+```bash
+uv run modal run src/recognize_modal/app.py::train_smoke \
+  --num-epochs 1 \
+  --max-train-batches 50 \
+  --seed 42
+```
+
+默认 smoke 配置对应：
+
+- `configs/dataset/MELD--E.toml`
+- `configs/encoders/T+A+V.toml`
+- `configs/fusion/DF-1.0.toml`
+- `configs/fusion/kwargs/attn.toml`
+- `configs/losses/classification/weight.toml`
+
+训练生成的检查点会落到 `emotion-recognition-checkpoints` Volume，对应远端仓库内的 `./checkpoints/` 路径。
+
 ## 核心特性
 
 ### 🚀 高效训练机制
